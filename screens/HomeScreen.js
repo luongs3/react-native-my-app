@@ -9,57 +9,95 @@ import {
   View,
 } from 'react-native';
 import { WebBrowser } from 'expo';
-
+import { getPost, PostFeedType, getPostsFeed } from 'viblo-sdk/api/posts'
+import Swiper from '../components/ReactNativeSwiper'
 import { MonoText } from '../components/StyledText';
+import LoadingScreen from '../components/LoadingScreen';
 
 export default class HomeScreen extends React.Component {
   static navigationOptions = {
     header: null,
   };
 
+  constructor(props) {
+    super(props)
+    this.state = {
+      data: [],
+      currentPage: 0,
+    }
+  }
+
+  componentDidMount() {
+    this.fetchPosts()
+  }
+
+  loadMore() {
+    this.fetchPosts(this.state.currentPage + 1)
+  }
+
+  fetchPosts(currentPage = 1) {
+    getPostsFeed('editors-choice', { page: currentPage, limit: 5 })
+      .then(({ data, meta: { pagination: { current_page: currentPage } } }) => {
+        console.log('data', data)
+        console.log('currentPage', currentPage)
+        this.setState({
+          data: [
+            ...this.removeLastElement([...this.state.data]),
+            ...data,
+            {
+              slug: 'special',
+              isLoadingPage: true,
+            }
+          ],
+          currentPage,
+        }, () => { console.log(this.state.data)})
+      })
+      .catch(e => console.log('e', e))
+  }
+
+  removeLastElement(data) {
+    if (data.length) {
+      data.pop()
+    }
+
+    return data
+  }
+
+  renderItem(post, i) {
+    if (post.isLoadingPage) {
+      return <LoadingScreen key={post.slug} />
+    }
+
+    return (
+      <ScrollView key={post.slug}>
+        <View style={{ flex: 1, flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ fontSize: 20, fontWeight: 'bold' }}>i: {i}</Text>
+          <Text style={{ fontSize: 26, fontWeight: 'bold' }}>{post.title}</Text>
+          <Text>{post.contents_short}</Text>
+        </View>
+      </ScrollView>
+    )
+  }
+
   render() {
+    if (!this.state.data.length) {
+      return null
+    }
+
     return (
       <View style={styles.container}>
-        <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-          <View style={styles.welcomeContainer}>
-            <Image
-              source={
-                __DEV__
-                  ? require('../assets/images/robot-dev.png')
-                  : require('../assets/images/robot-prod.png')
-              }
-              style={styles.welcomeImage}
-            />
-          </View>
-
-          <View style={styles.getStartedContainer}>
-            {this._maybeRenderDevelopmentModeWarning()}
-
-            <Text style={styles.getStartedText}>Get started by opening</Text>
-
-            <View style={[styles.codeHighlightContainer, styles.homeScreenFilename]}>
-              <MonoText style={styles.codeHighlightText}>screens/HomeScreen.js</MonoText>
-            </View>
-
-            <Text style={styles.getStartedText}>
-              Change this text and your app will automatically reload.
-            </Text>
-          </View>
-
-          <View style={styles.helpContainer}>
-            <TouchableOpacity onPress={this._handleHelpPress} style={styles.helpLink}>
-              <Text style={styles.helpLinkText}>Help, it didn’t automatically reload!</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-
-        <View style={styles.tabBarInfoContainer}>
-          <Text style={styles.tabBarInfoText}>This is a tab bar. You can edit it in:</Text>
-
-          <View style={[styles.codeHighlightContainer, styles.navigationFilename]}>
-            <MonoText style={styles.codeHighlightText}>navigation/MainTabNavigator.js</MonoText>
-          </View>
-        </View>
+        <Swiper
+          loadMinimal
+          loadMinimalSize={1}
+          style={styles.container}
+          loop={false}
+          onMomentumScrollEnd={() => console.log('onMomentumScrollEnd')}
+          onScrollBeginDrag={() => console.log('onScrollBeginDrag')}
+        >
+          {
+            this.state.data.map((post, i) => this.renderItem(post, i))
+          }
+        </Swiper>
       </View>
     );
   }
